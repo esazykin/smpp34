@@ -91,18 +91,27 @@ func (t *Transceiver) Bind(system_id string, password string, params *Params) er
 	return nil
 }
 
-func (t *Transceiver) SubmitSm(source_addr, destination_addr, short_message string, params *Params) (seq uint32, err error) {
-	p, err := t.Smpp.SubmitSm(source_addr, destination_addr, []byte(short_message), params)
-
+func (t *Transceiver) SubmitSm(sourceAddr, destinationAddr, shortMessage string, params *Params) ([]uint32, error) {
+	partsOfMessage, err := splitShortMessage(shortMessage, params)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	if err := t.Write(p); err != nil {
-		return 0, err
-	}
+	messageIds := make([]uint32, 0)
+	for _, part := range partsOfMessage {
+		pdu, err := t.Smpp.SubmitSm(sourceAddr, destinationAddr, part, params)
 
-	return p.GetHeader().Sequence, nil
+		if err != nil {
+			return nil, err
+		}
+
+		if err := t.Write(pdu); err != nil {
+			return nil, err
+		}
+
+		messageIds = append(messageIds, pdu.GetHeader().Sequence)
+	}
+	return messageIds, nil
 }
 
 func (t *Transceiver) DeliverSmResp(seq uint32, status CMDStatus) error {
