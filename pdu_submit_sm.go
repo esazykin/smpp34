@@ -82,6 +82,16 @@ func (s *SubmitSm) SetField(f string, v interface{}) error {
 	return FieldValueErr
 }
 
+func (s *SubmitSm) SetShortMessage(message []byte) error {
+	field := NewField(SHORT_MESSAGE, message)
+	if field != nil {
+		s.mandatoryFields[SHORT_MESSAGE] = field
+		return nil
+	}
+
+	return FieldValueErr
+}
+
 func (s *SubmitSm) SetSeqNum(i uint32) {
 	s.Header.Sequence = i
 }

@@ -153,7 +153,7 @@ func (s *Smpp) EnquireLinkResp(seq uint32) (Pdu, error) {
 	return Pdu(p), nil
 }
 
-func (s *Smpp) SubmitSm(source_addr, destination_addr, short_message string, params *Params) (Pdu, error) {
+func (s *Smpp) SubmitSm(sourceAddr, destinationAddr string, shortMessages []byte, params *Params) (Pdu, error) {
 
 	p, _ := NewSubmitSm(
 		&Header{
@@ -163,9 +163,9 @@ func (s *Smpp) SubmitSm(source_addr, destination_addr, short_message string, par
 		[]byte{},
 	)
 
-	p.SetField(SOURCE_ADDR, source_addr)
-	p.SetField(DESTINATION_ADDR, destination_addr)
-	p.SetField(SHORT_MESSAGE, short_message)
+	p.SetField(SOURCE_ADDR, sourceAddr)
+	p.SetField(DESTINATION_ADDR, destinationAddr)
+	p.SetShortMessage(shortMessages)
 
 	for f, v := range *params {
 		err := p.SetField(f, v)

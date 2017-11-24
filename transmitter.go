@@ -3,6 +3,9 @@ package smpp34
 import (
 	"crypto/tls"
 	"time"
+	"github.com/esazykin/smpp34/gsmutil"
+	"math"
+	"crypto/rand"
 )
 
 type Transmitter struct {
@@ -89,18 +92,88 @@ func (t *Transmitter) Bind(system_id string, password string, params *Params) er
 	return nil
 }
 
-func (t *Transmitter) SubmitSm(source_addr, destination_addr, short_message string, params *Params) (seq uint32, err error) {
-	p, err := t.Smpp.SubmitSm(source_addr, destination_addr, short_message, params)
+func (t *Transmitter) SubmitSm(sourceAddr, destinationAddr, shortMessage string, params *Params) ([]uint32, error) {
+
+	dataCoding, ok := (*params)[DATA_CODING];
+	if !ok {
+		dataCoding = ENCODING_DEFAULT
+	}
+
+	var octetLimit int
+	var message []byte
+	switch dataCoding {
+	case ENCODING_DEFAULT:
+		octetLimit = 160
+		message = []byte(shortMessage)
+		break
+
+	case ENCODING_ISO10646:
+		octetLimit = 140
+		message = gsmutil.EncodeUcs2(shortMessage)
+
+	default:
+		octetLimit = 254
+		message = []byte(shortMessage)
+	}
+
+	messageLen := len(message)
+
+	if messageLen > octetLimit {
+		totalParts := byte(int(math.Ceil(float64(messageLen) / 134.0)))
+		(*params)[ESM_CLASS] = ESM_CLASS_GSMFEAT_UDHI
+
+		uid := make([]byte, 1)
+		_, err := rand.Read(uid)
+		if err != nil {
+			return []uint32{}, err
+		}
+
+		partNum := 1
+		messageIds := make([]uint32, 0)
+		for i := 0; i < messageLen; i += 134 {
+			start := i
+			end := i + 134
+			if end > messageLen {
+				end = messageLen
+			}
+			part := []byte{0x05, 0x00, 0x03, uid[0], totalParts, byte(partNum)}
+			part = append(part, message[start:end]...)
+
+			pdu, err := t.sendSubmitSm(sourceAddr, destinationAddr, part, params)
+			if err != nil {
+				return messageIds, err
+			}
+
+			messageIds = append(messageIds, pdu.GetHeader().Sequence)
+			partNum++
+		}
+
+		return messageIds, nil
+	}
+
+	pdu, err := t.sendSubmitSm(sourceAddr, destinationAddr, message, params)
+	if err != nil {
+		return []uint32{}, err
+	}
+
+	messageIds := make([]uint32, 1)
+	messageIds[0] = pdu.GetHeader().Sequence
+
+	return messageIds, nil
+}
+
+func (t *Transmitter) sendSubmitSm(sourceAddr, destinationAddr string, message []byte, params *Params) (Pdu, error) {
+	pdu, err := t.Smpp.SubmitSm(sourceAddr, destinationAddr, message, params)
 
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	if err := t.Write(p); err != nil {
-		return 0, err
+	if err := t.Write(pdu); err != nil {
+		return nil, err
 	}
 
-	return p.GetHeader().Sequence, nil
+	return pdu, nil
 }
 
 func (t *Transmitter) QuerySm(message_id, source_addr string, params *Params) (seq uint32, err error) {

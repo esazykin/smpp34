@@ -2,28 +2,15 @@ package main
 
 import (
 	"fmt"
-	smpp "github.com/CodeMonkeyKevin/smpp34"
+	smpp "github.com/esazykin/smpp34"
 )
 
 func main() {
 	// connect and bind
-	tx, err := smpp.NewTransmitter(
-		"localhost",
-		9000,
-		5,
-		smpp.Params{
-			"system_type": "CMT",
-			"system_id":   "hugo",
-			"password":    "ggoohu",
-		},
-	)
-	if err != nil {
-		fmt.Println("Connection Err:", err)
-		return
-	}
+	transmitter := newTransmitter()
 
-	// Send SubmitSm
-	seq, err := tx.SubmitSm("test", "test2", "msg", &smpp.Params{})
+	// for latin and cyrillic symbols
+	messageIds, err := sendSMS(transmitter, "7913...", "test")
 
 	// Pdu gen errors
 	if err != nil {
@@ -31,10 +18,10 @@ func main() {
 	}
 
 	// Should save this to match with message_id
-	fmt.Println("seq:", seq)
+	fmt.Println(messageIds)
 
 	for {
-		pdu, err := tx.Read() // This is blocking
+		pdu, err := transmitter.Read() // This is blocking
 		if err != nil {
 			fmt.Println("Read Err:", err)
 			break
@@ -52,4 +39,41 @@ func main() {
 	}
 
 	fmt.Println("ending...")
+}
+
+func newTransmitter() *smpp.Transmitter {
+	transmitter, err := smpp.NewTransmitter(
+		"host",
+		1234,
+		5,
+		smpp.Params{
+			smpp.SYSTEM_TYPE: "",
+			smpp.SYSTEM_ID:   "",
+			smpp.PASSWORD:    "",
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return transmitter
+}
+
+func sendSMS(transmitter *smpp.Transmitter, phone, message string) ([]uint32, error) {
+	pduParams := smpp.Params{
+		smpp.DATA_CODING: smpp.ENCODING_ISO10646,
+	}
+
+	messageIds, err := transmitter.SubmitSm(
+		"...",
+		phone,
+		message,
+		&pduParams,
+	)
+
+	if err != nil {
+		return []uint32{}, err
+	}
+
+	return messageIds, nil
 }
