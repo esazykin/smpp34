@@ -1,6 +1,8 @@
 SMPP34
 ======
 
+The main difference between original package and that package is support of sending of long message in another encoding than latin
+
 Check [examples](https://github.com/CodeMonkeyKevin/smpp34/tree/master/examples) folder for usage details
 
 ##### Supported/Unsupported PDUs
